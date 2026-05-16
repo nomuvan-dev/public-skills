@@ -2,7 +2,7 @@
 name: launchd-schedule
 description: |
   macOSのlaunchdで定期タスクを実行するスケジューラ。
-  3モード: session(Claude対話), script(Claude -p), exec(任意コマンド)。
+  3モード: session(Claude対話), script(Codex CLI), exec(任意コマンド)。
   「スケジュール登録して」「スケジュール一覧」「スケジュール変更」「スケジュール削除」「今すぐ実行」で起動。
   「巡回スケジュール作って」「定期実行を設定して」でも起動。
 ---
@@ -16,9 +16,9 @@ macOSのlaunchdで定期タスクを実行する。Claude CLIだけでなく任�
 ### create — スケジュール登録
 
 3つのモードを選択可能:
-- **session**（デフォルト）: tmux上でClaudeセッションに入りプロンプトを送信
-- **script**: Claude CLIスクリプトモード（`claude -p "prompt"`）で実行
-- **exec**: 任意コマンドを直接実行（Claude不要。Python/bash等）
+- **session**（デフォルト）: tmux上でClaudeセッションに入りプロンプトを送信（Claudeサブスク維持）
+- **script**: Codex CLI非対話実行（`codex exec --full-auto --model gpt-5.5`）。旧 `claude -p` は従量課金化のためCodexへ移行
+- **exec**: 任意コマンドを直接実行（LLM不要。Python/bash等）
 
 ```bash
 SKILL_DIR=$(find .claude/skills/launchd-schedule -name manage-schedule.sh -exec dirname {} \; | head -1)/..
@@ -27,9 +27,11 @@ SKILL_DIR=$(find .claude/skills/launchd-schedule -name manage-schedule.sh -exec 
 bash "$SKILL_DIR/scripts/manage-schedule.sh" create \
   "<name>" "<cron-expr>" "<tmux-session>" "<workdir>" "<claude-cmd>" "<prompt>"
 
-# scriptモード（Claude -p）
+# scriptモード（Codex CLI非対話）
+# 5番目の <claude-cmd> 引数は後方互換のため残っているが現在は無視される
+# （内部で codex exec --full-auto --model gpt-5.5 が固定で使われる）
 bash "$SKILL_DIR/scripts/manage-schedule.sh" create \
-  "<name>" "<cron-expr>" "<tmux-session>" "<workdir>" "<claude-cmd>" "<prompt>" script
+  "<name>" "<cron-expr>" "<tmux-session>" "<workdir>" "" "<prompt>" script
 
 # execモード（任意コマンド。Claude不要）
 bash "$SKILL_DIR/scripts/manage-schedule.sh" create \
@@ -42,7 +44,7 @@ bash "$SKILL_DIR/scripts/manage-schedule.sh" create \
   - `*/N`形式はlaunchdのStartInterval(N×60秒)に自動変換
 - `tmux-session`: tmuxセッション名（execモードでは空文字""でOK）
 - `workdir`: ワークディレクトリ
-- `claude-cmd`: session/scriptモード→claudeコマンド、execモード→実行コマンド
+- `claude-cmd`: sessionモード→claudeコマンド、scriptモード→無視（Codex固定）、execモード→実行コマンド
 - `prompt`: session/scriptモード→プロンプト、execモード→コマンド引数
 
 例（Claude対話モード）:
@@ -117,7 +119,8 @@ launchd → guard-execution.sh <name> -- <実コマンド>
 guard → `run-scheduled-prompt.sh` → tmux + Claude対話
 
 ### scriptモード
-guard → `run-scheduled-script.sh` → tmux + `claude -p`
+guard → `run-scheduled-script.sh` → tmux + `codex exec --full-auto --model gpt-5.5`
+（環境変数 `CODEX_MODEL` / `CODEX_CMD` で上書き可。レートリミット検出時は1時間cooldown）
 
 ### execモード
 guard → `bash -c "cd workdir && command"`
