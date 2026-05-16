@@ -126,7 +126,7 @@ while [ "$WAITED" -lt "$MAX_WAIT" ]; do
   # レートリミット検出（Codex/OpenAI共通パターン）
   # command grep を使い zshrc の grep shell function による誤マッチを回避
   if [ "$RATE_LIMITED" = false ] && \
-     command grep -qiE "rate[ ._-]?limit|\b429\b|too many requests|quota.?exceeded|insufficient_quota" "$LOG_FILE" 2>/dev/null; then
+     command grep -qiE "rate_limit_exceeded|RateLimitError|HTTP[/ ][0-9.]+ 429|status[:_]+\s*429|429 too many requests|insufficient_quota" "$LOG_FILE" 2>/dev/null; then
     RATE_LIMITED=true
   fi
 
@@ -143,7 +143,7 @@ fi
 
 # 最終確認
 if [ "$RATE_LIMITED" = false ] && \
-   command grep -qiE "rate[ ._-]?limit|\b429\b|too many requests|quota.?exceeded|insufficient_quota" "$LOG_FILE" 2>/dev/null; then
+   command grep -qiE "rate_limit_exceeded|RateLimitError|HTTP[/ ][0-9.]+ 429|status[:_]+\s*429|429 too many requests|insufficient_quota" "$LOG_FILE" 2>/dev/null; then
   RATE_LIMITED=true
 fi
 
