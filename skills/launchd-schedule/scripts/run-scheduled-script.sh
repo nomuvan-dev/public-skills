@@ -4,7 +4,7 @@ set -euo pipefail
 # run-scheduled-script.sh — tmux上でCodex CLIをスクリプトモード実行（セッションに入らない）
 #
 # 旧仕様: `claude -p "prompt"` バッチ実行
-# 新仕様: `codex exec --full-auto --model gpt-5.5` でバッチ実行
+# 新仕様: `codex exec --model gpt-5.5 --dangerously-bypass-approvals-and-sandbox` でバッチ実行
 #         （Claude CLI -p は従量課金化のため、定額のCodex CLIへ移行）
 #
 # 既存の run-scheduled-prompt.sh（sessionモード=対話Claude）との違い:
@@ -26,8 +26,10 @@ LEGACY_CMD="${4:-}"  # 旧 claude コマンドライン。受け取るが使用�
 PROMPT="${5:?プロンプトが必要です}"
 
 # Codex CLI 設定（環境変数で上書き可）
+# 注意: --full-auto と --dangerously-bypass-approvals-and-sandbox は排他のため
+#       後者のみを使用する（前者は deprecated で --sandbox workspace-write のエイリアス）
 CODEX_MODEL="${CODEX_MODEL:-gpt-5.5}"
-CODEX_CMD="${CODEX_CMD:-codex exec --full-auto --model ${CODEX_MODEL} --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check}"
+CODEX_CMD="${CODEX_CMD:-codex exec --model ${CODEX_MODEL} --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check}"
 
 LOG_DIR="$HOME/.local/share/harness-schedule/logs"
 STATE_DIR="$HOME/.local/share/harness-schedule"
@@ -122,8 +124,9 @@ while [ "$WAITED" -lt "$MAX_WAIT" ]; do
   fi
 
   # レートリミット検出（Codex/OpenAI共通パターン）
+  # command grep を使い zshrc の grep shell function による誤マッチを回避
   if [ "$RATE_LIMITED" = false ] && \
-     grep -qiE "rate.limit|429|too many requests|quota.exceeded|insufficient_quota" "$LOG_FILE" 2>/dev/null; then
+     command grep -qiE "rate[ ._-]?limit|\b429\b|too many requests|quota.?exceeded|insufficient_quota" "$LOG_FILE" 2>/dev/null; then
     RATE_LIMITED=true
   fi
 
@@ -140,7 +143,7 @@ fi
 
 # 最終確認
 if [ "$RATE_LIMITED" = false ] && \
-   grep -qiE "rate.limit|429|too many requests|quota.exceeded|insufficient_quota" "$LOG_FILE" 2>/dev/null; then
+   command grep -qiE "rate[ ._-]?limit|\b429\b|too many requests|quota.?exceeded|insufficient_quota" "$LOG_FILE" 2>/dev/null; then
   RATE_LIMITED=true
 fi
 
